@@ -3,8 +3,16 @@
 import { useState, useEffect, useRef } from 'react'
 import { Mic, Video, Languages, Play, Square, Loader2 } from 'lucide-react'
 
-const ORCHESTRATOR_API = process.env.NEXT_PUBLIC_ORCHESTRATOR_API || 'http://localhost:3001'
-const ORCHESTRATOR_WS = process.env.NEXT_PUBLIC_ORCHESTRATOR_WS || 'ws://localhost:3001/ws'
+// Dynamic URLs based on current hostname (works on LAN)
+const getOrchestratorApi = () => {
+  if (typeof window === 'undefined') return 'http://localhost:3001'
+  return `http://${window.location.hostname}:3001`
+}
+
+const getOrchestratorWs = () => {
+  if (typeof window === 'undefined') return 'ws://localhost:3001/ws'
+  return `ws://${window.location.hostname}:3001/ws`
+}
 
 export default function Home() {
   const [meetLink, setMeetLink] = useState('')
@@ -19,7 +27,7 @@ export default function Home() {
 
   // WebSocket connection
   useEffect(() => {
-    const ws = new WebSocket(ORCHESTRATOR_WS)
+    const ws = new WebSocket(getOrchestratorWs())
     wsRef.current = ws
 
     ws.onopen = () => {
@@ -83,7 +91,7 @@ export default function Home() {
 
     setLoading(true)
     try {
-      const res = await fetch(`${ORCHESTRATOR_API}/sessions`, {
+      const res = await fetch(`${getOrchestratorApi()}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ meetLink, sourceLang, targetLang })
@@ -106,7 +114,7 @@ export default function Home() {
 
     setLoading(true)
     try {
-      await fetch(`${ORCHESTRATOR_API}/sessions/${session.id}`, {
+      await fetch(`${getOrchestratorApi()}/sessions/${session.id}`, {
         method: 'DELETE'
       })
       setSession(null)

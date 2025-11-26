@@ -45,18 +45,21 @@ if [ -d "$PROJECT_ROOT/services/integration/.venv" ]; then
 fi
 
 # Start UI
-echo "Starting UI on :3000..."
+echo "Starting UI on :4000..."
 cd "$PROJECT_ROOT/services/ui"
 npm run dev &
 UI_PID=$!
+
+# Get local IP
+LOCAL_IP=$(hostname -I | awk '{print $1}')
 
 echo "
 ╔═══════════════════════════════════════════════════════════════╗
 ║  All services started!                                        ║
 ╠═══════════════════════════════════════════════════════════════╣
-║  UI:          http://localhost:3000                           ║
-║  Orchestrator: http://localhost:3001                          ║
-║  WebSocket:    ws://localhost:3001/ws                         ║
+║  UI:           http://$LOCAL_IP:4000
+║  Orchestrator: http://$LOCAL_IP:3001
+║  WebSocket:    ws://$LOCAL_IP:3001/ws
 ╚═══════════════════════════════════════════════════════════════╝
 
 Press Ctrl+C to stop all services...

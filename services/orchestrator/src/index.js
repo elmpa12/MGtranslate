@@ -18,7 +18,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.resolve(__dirname, '../../../.env') });
 
-const PORT = process.env.ORCHESTRATOR_PORT || 3001;
+const PORT = parseInt(process.env.ORCHESTRATOR_PORT) || 3001;
 
 // Session storage
 const sessions = new Map();
