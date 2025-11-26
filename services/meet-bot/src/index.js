@@ -148,14 +148,26 @@ class MeetBot {
     this.page = null;
     this.status = 'initializing';
     this.streamInterval = null;
+    this.permissionsDismissed = false; // Track if we already handled permissions dialog
   }
 
   async start() {
     try {
       log.info({ sessionId: this.sessionId }, 'Starting bot');
 
+      // Clean up stale SingletonLock to prevent "File exists" error
+      const singletonLock = path.join(PROFILE_DIR, 'SingletonLock');
+      try {
+        if (fs.existsSync(singletonLock)) {
+          fs.unlinkSync(singletonLock);
+          log.info({ sessionId: this.sessionId }, 'Removed stale SingletonLock');
+        }
+      } catch (lockErr) {
+        log.warn({ sessionId: this.sessionId, err: lockErr.message }, 'Could not remove SingletonLock');
+      }
+
       this.browser = await puppeteer.launch({
-        headless: 'new',  // Use headless mode
+        headless: false,  // Use real Chrome with xvfb to bypass headless detection
         userDataDir: PROFILE_DIR,
         args: [
           '--no-sandbox',
@@ -167,6 +179,7 @@ class MeetBot {
           '--disable-infobars',
           '--password-store=basic',
           '--disable-features=LockProfileCookieDatabase',
+          '--window-size=1280,720',
         ],
         defaultViewport: { width: 1280, height: 720 }
       });
@@ -233,6 +246,57 @@ class MeetBot {
   }
 
   async clickJoinButton() {
+    // First, dismiss any permissions modal that may be blocking
+    await this.dismissPermissionsModal();
+
+    // Then, check if we need to enter a guest name
+    try {
+      const nameInput = await this.page.$('input[placeholder="Your name"]');
+      if (nameInput) {
+        log.info({ sessionId: this.sessionId }, 'Guest join detected - entering name');
+        await nameInput.click();
+        await nameInput.type('MGtranslate Bot', { delay: 50 });
+        await this.delay(500);
+      }
+    } catch (err) {
+      log.warn({ sessionId: this.sessionId }, 'Could not find name input');
+    }
+
+    // Dismiss again in case it appeared after name entry
+    await this.dismissPermissionsModal();
+
+    // Now click join button
+    await this.clickJoinButtonOnly();
+  }
+
+  async dismissPermissionsModal() {
+    // This modal blocks the entire page: "Do you want people to see and hear you in the meeting?"
+    // Need to click "Continue without microphone and camera" link
+    try {
+      const clicked = await this.page.evaluate(() => {
+        // Look for the specific "Continue without" link in the permissions modal
+        const links = document.querySelectorAll('a, span, button, div[role="link"]');
+        for (const el of links) {
+          const text = el.textContent?.toLowerCase() || '';
+          if (text.includes('continue without') || text.includes('continuar sem')) {
+            el.click();
+            return true;
+          }
+        }
+        return false;
+      });
+
+      if (clicked) {
+        log.info({ sessionId: this.sessionId }, 'Dismissed permissions modal (Continue without)');
+        await this.delay(1000); // Wait for modal to close
+      }
+    } catch (err) {
+      // Modal not present, continue
+    }
+  }
+
+  async clickJoinButtonOnly() {
+    // Click join button without entering name
     const buttons = await this.page.$$('button');
     for (const btn of buttons) {
       const text = await btn.evaluate(el => el.textContent?.toLowerCase() || '');
@@ -245,6 +309,72 @@ class MeetBot {
     log.warn({ sessionId: this.sessionId }, 'Join button not found');
   }
 
+  async dismissPermissionsDialog() {
+    // Handle various dialogs that can block joining
+    let anyDismissed = false;
+
+    try {
+      // FIRST: Try clicking "Got it" tooltip if present (it can overlay other buttons)
+      // Use broader selector and includes matching for robustness
+      const gotIt = await this.page.evaluate(() => {
+        // Search ALL clickable elements - tooltip button might not have role="button"
+        const allElements = document.querySelectorAll('button, [role="button"], span[tabindex], div[tabindex], a');
+        for (const el of allElements) {
+          const text = el.textContent?.toLowerCase()?.trim() || '';
+          // Use includes and check for small text (not a container with lots of text)
+          if ((text.includes('got it') || text === 'entendi' || text === 'ok') && text.length < 30) {
+            el.click();
+            return text;
+          }
+        }
+        return null;
+      });
+
+      if (gotIt) {
+        log.info({ sessionId: this.sessionId, buttonText: gotIt }, 'Dismissed "Got it" tooltip');
+        await this.delay(1000);
+        anyDismissed = true;
+      }
+
+      // SECOND: Check if we're on the pre-join screen (has "Join now" button visible)
+      // If so, don't look for "Continue without" - just return so we can click Join
+      const isPreJoinScreen = await this.page.evaluate(() => {
+        const pageText = document.body.innerText?.toLowerCase() || '';
+        return pageText.includes('join now') || pageText.includes('participar agora');
+      });
+
+      if (isPreJoinScreen) {
+        // On pre-join screen, don't try to click "Continue without"
+        // The Join button should work since we have fake devices
+        return anyDismissed;
+      }
+
+      // THIRD: Only in meeting context, try clicking "Continue without microphone and camera"
+      const clicked = await this.page.evaluate(() => {
+        // Look for links/spans containing "Continue without" or "Continuar sem"
+        const elements = document.querySelectorAll('span, a, button, div');
+        for (const el of elements) {
+          const text = el.textContent?.toLowerCase() || '';
+          if (text.includes('continue without') || text.includes('continuar sem')) {
+            el.click();
+            return true;
+          }
+        }
+        return false;
+      });
+
+      if (clicked) {
+        log.info({ sessionId: this.sessionId }, 'Clicked "Continue without microphone and camera"');
+        await this.delay(2000);
+        anyDismissed = true;
+      }
+
+    } catch (err) {
+      log.warn({ sessionId: this.sessionId, err: err.message }, 'Error dismissing permissions dialog');
+    }
+    return anyDismissed;
+  }
+
   async waitForAdmission() {
     this.updateStatus('waiting_admission');
 
@@ -252,8 +382,45 @@ class MeetBot {
       await this.delay(5000);
 
       try {
+        // First, check for and dismiss permissions dialog (only once)
+        if (!this.permissionsDismissed) {
+          const dismissed = await this.dismissPermissionsDialog();
+          if (dismissed) {
+            this.permissionsDismissed = true; // Mark as handled - don't try again
+            log.info({ sessionId: this.sessionId }, 'Permissions dialog dismissed, waiting for page state...');
+            await this.delay(2000);
+            continue;
+          }
+        }
+
+        // Check if still on pre-join screen (Join button visible) and try to click it
+        const hasJoinButton = await this.page.evaluate(() => {
+          const buttons = document.querySelectorAll('button');
+          for (const btn of buttons) {
+            const text = btn.textContent?.toLowerCase() || '';
+            if (text.includes('join now') || text.includes('participar agora') || text.includes('pedir para participar')) {
+              return true;
+            }
+          }
+          return false;
+        });
+
+        if (hasJoinButton) {
+          // Take debug screenshot to see what's blocking
+          await this.page.screenshot({ path: `/tmp/meet-bot-${this.sessionId}-join-${i}.png` });
+          log.info({ sessionId: this.sessionId, screenshot: `/tmp/meet-bot-${this.sessionId}-join-${i}.png` }, 'Join button still visible - screenshot saved');
+
+          // Also check page text to understand state
+          const pageState = await this.page.evaluate(() => document.body.innerText?.substring(0, 500));
+          log.info({ sessionId: this.sessionId, pageState: pageState?.substring(0, 200) }, 'Page state');
+
+          await this.clickJoinButtonOnly();
+          await this.delay(2000); // Wait for any dialog to appear after clicking
+          continue;
+        }
+
         // Take screenshot for debugging
-        if (i === 0 || i === 5) {
+        if (i === 0 || i === 5 || i === 10) {
           await this.page.screenshot({ path: `/tmp/meet-bot-${this.sessionId}-${i}.png` });
           log.info({ sessionId: this.sessionId, screenshot: `/tmp/meet-bot-${this.sessionId}-${i}.png` }, 'Screenshot saved');
         }
@@ -262,24 +429,33 @@ class MeetBot {
         const url = this.page.url();
         const pageText = await this.page.evaluate(() => document.body.innerText?.toLowerCase() || '');
 
+        // Check for leave button (reliable indicator that we're actually in the meeting)
+        const hasLeaveButton = pageText.includes('leave call') ||
+                               pageText.includes('sair da chamada') ||
+                               pageText.includes('desligar');
+
         log.info({
           sessionId: this.sessionId,
           iteration: i,
           url,
           tracks: status?.tracks || 0,
           liveTracks: status?.liveTracks || 0,
-          hasLeaveButton: pageText.includes('leave call') || pageText.includes('sair da chamada')
+          hasLeaveButton
         }, 'Admission check');
 
-        // Check if we have audio tracks (reliable indicator)
-        if (status?.liveTracks > 0) {
-          log.info({ sessionId: this.sessionId }, 'Detected live audio tracks - in call');
+        // Primary check: Leave button must be visible (most reliable indicator)
+        if (hasLeaveButton) {
+          log.info({ sessionId: this.sessionId }, 'Detected leave button - in call');
           return;
         }
 
-        // Check if Leave button is visible (must be specific - "Sair da chamada" not just "sair")
-        if (pageText.includes('leave call') || pageText.includes('sair da chamada') || pageText.includes('desligar')) {
-          log.info({ sessionId: this.sessionId }, 'Detected leave button - in call');
+        // Secondary check: audio tracks AND no permissions dialog visible
+        const hasPermissionsDialog = pageText.includes('want people to see') ||
+                                      pageText.includes('allow microphone') ||
+                                      pageText.includes('continue without');
+
+        if (status?.liveTracks > 0 && !hasPermissionsDialog) {
+          log.info({ sessionId: this.sessionId }, 'Detected live audio tracks without permissions dialog - in call');
           return;
         }
 
