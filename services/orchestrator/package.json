@@ -1,0 +1,18 @@
+{
+  "name": "mgtranslate-orchestrator",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "fastify": "^4.24.3",
+    "@fastify/websocket": "^8.3.1",
+    "@fastify/cors": "^8.4.1",
+    "uuid": "^9.0.1",
+    "dotenv": "^16.3.1",
+    "pino": "^8.16.2",
+    "pino-pretty": "^10.2.3"
+  }
+}

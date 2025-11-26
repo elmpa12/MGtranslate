@@ -1,0 +1,9 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+websockets==12.0
+python-dotenv==1.0.0
+google-cloud-speech==2.23.0
+google-cloud-translate==3.13.0
+google-cloud-texttospeech==2.15.1
+pydantic==2.5.2
+aiofiles==23.2.1

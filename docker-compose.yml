@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # ===========================================
+  # Orchestrator - Central Hub
+  # ===========================================
+  orchestrator:
+    build:
+      context: ./services/orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - ORCHESTRATOR_PORT=3001
+    volumes:
+      - ./.env:/app/.env:ro
+    networks:
+      - mgtranslate
+    restart: unless-stopped
+
+  # ===========================================
+  # Meet Bot - Puppeteer Bot
+  # ===========================================
+  meet-bot:
+    build:
+      context: ./services/meet-bot
+      dockerfile: Dockerfile
+    environment:
+      - ORCHESTRATOR_WS=ws://orchestrator:3001/ws
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./poc/meet-audio-capture/session/chrome-profile:/app/chrome-profile:ro
+      - ./config/credentials:/app/config/credentials:ro
+    depends_on:
+      - orchestrator
+    networks:
+      - mgtranslate
+    restart: unless-stopped
+    # Chrome needs these
+    shm_size: '2gb'
+    cap_add:
+      - SYS_ADMIN
+
+  # ===========================================
+  # Integration - STT/Translation/TTS
+  # ===========================================
+  integration:
+    build:
+      context: ./services/integration
+      dockerfile: Dockerfile
+    environment:
+      - ORCHESTRATOR_WS=ws://orchestrator:3001/ws
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
+    volumes:
+      - ./config/credentials:/app/credentials:ro
+    depends_on:
+      - orchestrator
+    networks:
+      - mgtranslate
+    restart: unless-stopped
+
+  # ===========================================
+  # UI - Next.js Frontend
+  # ===========================================
+  ui:
+    build:
+      context: ./services/ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_ORCHESTRATOR_API=http://localhost:3001
+      - NEXT_PUBLIC_ORCHESTRATOR_WS=ws://localhost:3001/ws
+    depends_on:
+      - orchestrator
+    networks:
+      - mgtranslate
+    restart: unless-stopped
+
+networks:
+  mgtranslate:
+    driver: bridge
