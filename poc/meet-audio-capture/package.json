@@ -1,0 +1,23 @@
+{
+  "name": "meet-audio-capture-poc",
+  "version": "0.1.0",
+  "description": "PoC para validar captura de áudio do Google Meet via Playwright",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "test:login": "node src/test-login.js",
+    "test:join": "node src/test-join-meet.js",
+    "test:capture": "node src/test-audio-capture.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "playwright": "^1.40.0",
+    "puppeteer": "^24.31.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "wav": "^1.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0"
+  }
+}

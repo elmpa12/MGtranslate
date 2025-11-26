@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment & Credentials
+.env
+.env.local
+config/credentials/*.json
+
+# Build
+dist/
+build/
+.next/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Audio files
+*.wav
+*.mp3
+*.pcm
+*.webm
+
+# Session & Output (sensitive)
+**/session/
+**/output/
+**/chrome-profile/
+**/*.png
+
+# Credentials
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
