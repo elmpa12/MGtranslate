@@ -176,11 +176,15 @@ function handleMessage(clientId, clientType, message, socket) {
 
     case 'bot:audio':
       // Bot sending audio chunk - forward to integration service
+      // Include language settings from session for bidirectional translation
+      const audioSession = sessions.get(sessionId);
       broadcast('integration', {
         type: 'audio:process',
         sessionId,
         audio: message.audio,
-        format: message.format || 'webm'
+        format: message.format || 'webm',
+        sourceLang: audioSession?.sourceLang || 'en-US',
+        targetLang: audioSession?.targetLang || 'pt-BR'
       });
       break;
 

@@ -107,17 +107,32 @@ class IntegrationService:
         source_lang: str,
         target_lang: str
     ):
-        """Full pipeline: STT -> Translate -> TTS"""
+        """Full pipeline: STT (with language detection) -> Translate -> TTS
+
+        Bidirectional translation:
+        - Detects which language is being spoken (source or target)
+        - Translates to the opposite language
+        """
         try:
             # Decode audio
             audio_bytes = base64.b64decode(audio_b64)
 
-            # 1. Speech-to-Text
-            transcript = await self.speech_to_text(audio_bytes, source_lang)
+            # 1. Speech-to-Text with bidirectional language detection
+            # Try to recognize in both languages and pick the best result
+            transcript, detected_lang = await self.speech_to_text_bidirectional(
+                audio_bytes, source_lang, target_lang
+            )
             if not transcript:
                 return
 
-            logger.info(f"[{session_id}] Transcript: {transcript[:50]}...")
+            logger.info(f"[{session_id}] Detected: {detected_lang} | Transcript: {transcript[:50]}...")
+
+            # Determine translation direction
+            # If spoken in source lang, translate to target; otherwise translate to source
+            if detected_lang.startswith(source_lang.split("-")[0]):
+                translate_to = target_lang
+            else:
+                translate_to = source_lang
 
             # Send transcript to orchestrator
             await self.send({
@@ -126,25 +141,26 @@ class IntegrationService:
                 "transcript": {
                     "id": f"{session_id}-{asyncio.get_event_loop().time()}",
                     "text": transcript,
-                    "lang": source_lang
+                    "lang": detected_lang,
+                    "direction": f"{detected_lang} → {translate_to}"
                 }
             })
 
-            # 2. Translate
-            translation = await self.translate_text(transcript, target_lang)
-            logger.info(f"[{session_id}] Translation: {translation[:50]}...")
+            # 2. Translate to the opposite language
+            translation = await self.translate_text(transcript, translate_to)
+            logger.info(f"[{session_id}] Translation ({translate_to}): {translation[:50]}...")
 
             await self.send({
                 "type": "integration:translation",
                 "sessionId": session_id,
                 "translation": {
                     "text": translation,
-                    "lang": target_lang
+                    "lang": translate_to
                 }
             })
 
-            # 3. Text-to-Speech
-            tts_audio = await self.text_to_speech(translation, target_lang)
+            # 3. Text-to-Speech in the target language
+            tts_audio = await self.text_to_speech(translation, translate_to)
 
             await self.send({
                 "type": "integration:tts",
@@ -155,8 +171,50 @@ class IntegrationService:
         except Exception as e:
             logger.error(f"[{session_id}] Pipeline error: {e}")
 
+    async def speech_to_text_bidirectional(
+        self,
+        audio_bytes: bytes,
+        lang1: str,
+        lang2: str
+    ) -> tuple[Optional[str], str]:
+        """
+        Speech-to-Text with automatic language detection between two languages.
+
+        Uses Google's alternative_language_codes feature to detect and transcribe
+        in whichever language is being spoken.
+
+        Returns: (transcript, detected_language_code)
+        """
+        try:
+            audio = speech.RecognitionAudio(content=audio_bytes)
+
+            # Configure STT with both languages
+            # Google will auto-detect which one is being spoken
+            config = speech.RecognitionConfig(
+                encoding=speech.RecognitionConfig.AudioEncoding.WEBM_OPUS,
+                sample_rate_hertz=48000,
+                language_code=lang1,  # Primary language
+                alternative_language_codes=[lang2],  # Also check this language
+                enable_automatic_punctuation=True,
+            )
+
+            response = self.speech_client.recognize(config=config, audio=audio)
+
+            if response.results:
+                result = response.results[0]
+                transcript = result.alternatives[0].transcript
+                # Get the detected language from the result
+                detected_lang = result.language_code if hasattr(result, 'language_code') else lang1
+                return transcript, detected_lang
+
+            return None, lang1
+
+        except Exception as e:
+            logger.error(f"STT bidirectional error: {e}")
+            return None, lang1
+
     async def speech_to_text(self, audio_bytes: bytes, lang: str) -> Optional[str]:
-        """Convert audio to text using Google Speech-to-Text"""
+        """Convert audio to text using Google Speech-to-Text (single language)"""
         try:
             audio = speech.RecognitionAudio(content=audio_bytes)
             config = speech.RecognitionConfig(

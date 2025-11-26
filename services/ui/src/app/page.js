@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { Mic, Video, Languages, Play, Square, Loader2 } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Mic, Video, Languages, Play, Square, Loader2, Wifi, WifiOff } from 'lucide-react'
 
 // Dynamic URLs based on current hostname (works on LAN)
 const getOrchestratorApi = () => {
@@ -11,7 +11,9 @@ const getOrchestratorApi = () => {
 
 const getOrchestratorWs = () => {
   if (typeof window === 'undefined') return 'ws://localhost:3001/ws'
-  return `ws://${window.location.hostname}:3001/ws`
+  // Use wss:// if page is served over https, otherwise use ws://
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${window.location.hostname}:3001/ws`
 }
 
 export default function Home() {
@@ -22,31 +24,76 @@ export default function Home() {
   const [transcripts, setTranscripts] = useState([])
   const [botStatus, setBotStatus] = useState('idle')
   const [loading, setLoading] = useState(false)
+  const [wsConnected, setWsConnected] = useState(false)
+  const [wsError, setWsError] = useState(null)
   const wsRef = useRef(null)
+  const reconnectTimeoutRef = useRef(null)
   const transcriptsEndRef = useRef(null)
 
-  // WebSocket connection
-  useEffect(() => {
-    const ws = new WebSocket(getOrchestratorWs())
-    wsRef.current = ws
+  // WebSocket connection with reconnection logic
+  const connectWebSocket = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'register', clientType: 'ui' }))
+    const wsUrl = getOrchestratorWs()
+    console.log('Connecting to WebSocket:', wsUrl)
+
+    try {
+      const ws = new WebSocket(wsUrl)
+      wsRef.current = ws
+
+      ws.onopen = () => {
+        console.log('WebSocket connected!')
+        setWsConnected(true)
+        setWsError(null)
+        ws.send(JSON.stringify({ type: 'register', clientType: 'ui' }))
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data)
+          handleWsMessage(message)
+        } catch (e) {
+          console.error('Failed to parse message:', e)
+        }
+      }
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error)
+        setWsError('Connection error')
+      }
+
+      ws.onclose = (event) => {
+        console.log('WebSocket closed:', event.code, event.reason)
+        setWsConnected(false)
+        wsRef.current = null
+
+        // Reconnect after 3 seconds
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current)
+        }
+        reconnectTimeoutRef.current = setTimeout(() => {
+          console.log('Attempting to reconnect...')
+          connectWebSocket()
+        }, 3000)
+      }
+    } catch (err) {
+      console.error('Failed to create WebSocket:', err)
+      setWsError('Failed to connect')
     }
-
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data)
-      handleWsMessage(message)
-    }
-
-    ws.onclose = () => {
-      setTimeout(() => {
-        // Reconnect logic
-      }, 3000)
-    }
-
-    return () => ws.close()
   }, [])
+
+  useEffect(() => {
+    connectWebSocket()
+
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+      }
+      if (wsRef.current) {
+        wsRef.current.close()
+      }
+    }
+  }, [connectWebSocket])
 
   const handleWsMessage = (message) => {
     switch (message.type) {
@@ -140,11 +187,23 @@ export default function Home() {
     <main className="min-h-screen p-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <Languages className="w-10 h-10 text-blue-500" />
-          <div>
-            <h1 className="text-3xl font-bold">MGtranslate</h1>
-            <p className="text-gray-400">Real-time Meeting Translation</p>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <Languages className="w-10 h-10 text-blue-500" />
+            <div>
+              <h1 className="text-3xl font-bold">MGtranslate</h1>
+              <p className="text-gray-400">Real-time Meeting Translation</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {wsConnected ? (
+              <Wifi className="w-5 h-5 text-green-500" />
+            ) : (
+              <WifiOff className="w-5 h-5 text-red-500" />
+            )}
+            <span className={`text-sm ${wsConnected ? 'text-green-500' : 'text-red-500'}`}>
+              {wsConnected ? 'Connected' : wsError || 'Disconnected'}
+            </span>
           </div>
         </div>
 
@@ -243,6 +302,14 @@ export default function Home() {
             ) : (
               transcripts.map((t, i) => (
                 <div key={t.id || i} className="border-l-2 border-blue-500 pl-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs px-2 py-0.5 bg-blue-900 text-blue-300 rounded">
+                      {t.lang || 'detected'}
+                    </span>
+                    {t.direction && (
+                      <span className="text-xs text-gray-500">{t.direction}</span>
+                    )}
+                  </div>
                   <p className="text-gray-300">{t.text}</p>
                   {t.translation && (
                     <p className="text-green-400 mt-1 text-sm">

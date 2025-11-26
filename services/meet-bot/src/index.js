@@ -22,6 +22,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.resolve(__dirname, '../../../.env') });
 
 const ORCHESTRATOR_WS = process.env.ORCHESTRATOR_WS || 'ws://localhost:3001/ws';
+// Chrome profile directory with logged-in Google account (Default profile)
 const PROFILE_DIR = path.resolve(__dirname, '../../../poc/meet-audio-capture/session/chrome-profile');
 
 const log = pino({
@@ -154,7 +155,7 @@ class MeetBot {
       log.info({ sessionId: this.sessionId }, 'Starting bot');
 
       this.browser = await puppeteer.launch({
-        headless: true,
+        headless: 'new',  // Use headless mode
         userDataDir: PROFILE_DIR,
         args: [
           '--no-sandbox',
@@ -162,6 +163,10 @@ class MeetBot {
           '--use-fake-ui-for-media-stream',
           '--use-fake-device-for-media-stream',
           '--autoplay-policy=no-user-gesture-required',
+          '--disable-blink-features=AutomationControlled',
+          '--disable-infobars',
+          '--password-store=basic',
+          '--disable-features=LockProfileCookieDatabase',
         ],
         defaultViewport: { width: 1280, height: 720 }
       });
@@ -246,15 +251,50 @@ class MeetBot {
     for (let i = 0; i < 60; i++) { // 5 min timeout
       await this.delay(5000);
 
-      const status = await this.page.evaluate(() => window.__mgGetStatus?.());
-      const pageText = await this.page.evaluate(() => document.body.innerText.toLowerCase());
+      try {
+        // Take screenshot for debugging
+        if (i === 0 || i === 5) {
+          await this.page.screenshot({ path: `/tmp/meet-bot-${this.sessionId}-${i}.png` });
+          log.info({ sessionId: this.sessionId, screenshot: `/tmp/meet-bot-${this.sessionId}-${i}.png` }, 'Screenshot saved');
+        }
 
-      if (status?.tracks > 0 || pageText.includes('leave call') || pageText.includes('sair')) {
-        return; // Admitted
-      }
+        const status = await this.page.evaluate(() => window.__mgGetStatus?.());
+        const url = this.page.url();
+        const pageText = await this.page.evaluate(() => document.body.innerText?.toLowerCase() || '');
 
-      if (pageText.includes("can't join") || pageText.includes('denied')) {
-        throw new Error('Entry denied');
+        log.info({
+          sessionId: this.sessionId,
+          iteration: i,
+          url,
+          tracks: status?.tracks || 0,
+          liveTracks: status?.liveTracks || 0,
+          hasLeaveButton: pageText.includes('leave call') || pageText.includes('sair da chamada')
+        }, 'Admission check');
+
+        // Check if we have audio tracks (reliable indicator)
+        if (status?.liveTracks > 0) {
+          log.info({ sessionId: this.sessionId }, 'Detected live audio tracks - in call');
+          return;
+        }
+
+        // Check if Leave button is visible (must be specific - "Sair da chamada" not just "sair")
+        if (pageText.includes('leave call') || pageText.includes('sair da chamada') || pageText.includes('desligar')) {
+          log.info({ sessionId: this.sessionId }, 'Detected leave button - in call');
+          return;
+        }
+
+        // Check for errors
+        if (pageText.includes("can't join") || pageText.includes('denied') || pageText.includes('não pode participar')) {
+          throw new Error('Entry denied');
+        }
+
+        // Check if still on waiting screen
+        if (pageText.includes('asking to be let in') || pageText.includes('pedindo para entrar')) {
+          log.info({ sessionId: this.sessionId }, 'Still waiting for admission...');
+        }
+
+      } catch (evalError) {
+        log.warn({ sessionId: this.sessionId, err: evalError.message }, 'Evaluation error during admission check');
       }
     }
 
