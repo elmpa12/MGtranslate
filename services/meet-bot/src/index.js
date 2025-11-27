@@ -22,8 +22,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.resolve(__dirname, '../../../.env') });
 
 const ORCHESTRATOR_WS = process.env.ORCHESTRATOR_WS || 'ws://localhost:3001/ws';
-// Chrome profile directory with logged-in Google account (Default profile)
-const PROFILE_DIR = path.resolve(__dirname, '../../../poc/meet-audio-capture/session/chrome-profile');
+// Chrome profile directory with logged-in Google account (mgtranslate58@gmail.com)
+const PROFILE_DIR = path.resolve(__dirname, '../chrome-profile');
 
 const log = pino({
   transport: {
