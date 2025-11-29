@@ -1,333 +1,203 @@
-## 1. O que o MVP faz, em termos humanos
+# MGtranslate
 
-**Objetivo:**  
-Você tem duas pessoas (ou dois “lados”) que não falam a mesma língua.  
-Alguém que tem o app configura os idiomas, o bot entra na call do Google Meet como convidado, o host aceita, e o bot:
+Real-time bidirectional translation for Google Meet calls. Enables seamless communication between participants speaking different languages.
 
-- Escuta tudo que é dito.
-    
-- Descobre em que idioma aquilo foi falado.
-    
-- Traduz para o outro idioma.
-    
-- Fala a tradução dentro da mesma call, na vez dele.
-    
+## Features
 
-Sem extensão. Sem overlay. Só um terceiro “participante” que é o intérprete.
+- **Bidirectional Translation** - Automatically detects and translates between two languages (e.g., Portuguese ↔ English)
+- **Real-time Processing** - Translates speech as it happens with minimal delay
+- **Context-Aware Translation** - Uses GPT-4o-mini with conversation memory for natural, idiomatic translations
+- **Business Meeting Optimized** - System prompt designed for professional communication clarity
+- **Chrome Extension** - Easy-to-use interface integrated with Google Meet
 
-### Fluxo de uso (lado do usuário do app)
+## How It Works
 
-1. Pessoa abre o app (desktop ou web).
-    
-2. Faz login com Google (OAuth) só para:
-    
-    - Ler reuniões do Calendar ou colar o link da call.
-        
-3. Configura:
-    
-    - **Idioma A** (ex.: Português).
-        
-    - **Idioma B** (ex.: Inglês).
-        
-    - Se o bot vai **falar na call** (áudio) ou só **mandar texto no chat** (pra versão 1 eu focaria em áudio).
-        
-4. Escolhe a reunião (ou cola o link do Meet).
-    
-5. Clica em **“Iniciar Intérprete”**.
-    
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│ Chrome Extension│────►│   Orchestrator  │────►│   Integration   │
+│ (Audio Capture) │◄────│   (Node.js)     │◄────│   (Python)      │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                                    ┌───────────────────┼───────────────────┐
+                                    ▼                   ▼                   ▼
+                              Google STT          OpenAI GPT          Google TTS
+                            (Speech→Text)        (Translation)       (Text→Speech)
+```
 
-### Fluxo na reunião (do ponto de vista dos participantes)
+1. **Capture** - Extension captures audio from your microphone and other meeting participants
+2. **Transcribe** - Google Speech-to-Text converts audio to text and detects language
+3. **Translate** - GPT-4o-mini translates with context from previous exchanges
+4. **Speak** - Google Text-to-Speech generates natural audio output
 
-1. Aparece um convidado na call: **“Falcom Translator”**.
-    
-2. O host (qualquer pessoa) aceita o bot.
-    
-3. A partir daí:
-    
-    - Quando alguém fala em **Idioma A**, o bot entra depois de ~1s falando a versão em **Idioma B**.
-        
-    - Quando alguém fala em **Idioma B**, o bot faz o inverso: fala em **Idioma A**.
-        
-4. Todo mundo continua usando o Meet normal, sem precisar instalar nada.
-    
+## Quick Start
 
----
+### Prerequisites
 
-## 2. Pipeline técnico do MVP (simplificado mesmo)
+- Node.js 18+
+- Python 3.11+
+- Google Cloud account with APIs enabled:
+  - Speech-to-Text API
+  - Text-to-Speech API
+- OpenAI API key
+- Chrome browser
 
-Sem diarização complicada, sem “quem levantou a mão”. Vamos no **mínimo viável que funciona bem**.
+### Installation
 
-### 2.1. Componentes
+```bash
+# Clone the repository
+git clone https://github.com/your-repo/MGtranslate.git
+cd MGtranslate
 
-- **App de Controle (Client)**
-    
-    - Onde o usuário escolhe idiomas, cola link da call, clica em Start/Stop.
-        
-- **Bot de Reunião (Headless)**
-    
-    - Navegador headless (Playwright/Puppeteer) logado numa conta `bot@seuservico.com`.
-        
-    - Entra no link do Meet, abre áudio e microfone (sob seu controle).
-        
-- **Motor de Tradução (Backend)**
-    
-    - Recebe áudio do bot.
-        
-    - Faz:
-        
-        1. STT (Speech-to-Text).
-            
-        2. Detecção de idioma.
-            
-        3. Tradução para o outro idioma.
-            
-        4. TTS (Text-to-Speech).
-            
-    - Devolve áudio pronto pro bot falar.
-        
+# Install Orchestrator dependencies
+cd services/orchestrator
+npm install
 
-### 2.2. Passo a passo do áudio
+# Install Integration Service dependencies
+cd ../integration
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-Loop contínuo:
+### Configuration
 
-1. **Bot escuta áudio da call**
-    
-    - No navegador headless você pega o track de áudio WebRTC e manda chunks (por ex. 200–500ms) para o backend.
-        
-2. **STT + detecção de idioma**
-    
-    - Backend chama um **Speech-to-Text de streaming** com **idioma principal + alternativos** (ex.: `pt-BR` com alternativos `en`, `es`, `ja`, `ko`, `zh`).
-        
-    - Google Cloud Speech-to-Text permite configurar `alternativeLanguageCodes` para reconhecer mais de um idioma na mesma sessão.[Google Cloud](https://cloud.google.com/speech-to-text/docs/enable-language-recognition-speech-to-text?authuser=0&hl=pt-br&utm_source=chatgpt.com)
-        
-    - Sai algo assim:
-        
-        `{   "text": "We need to ship by Friday",   "language": "en" }`
-        
-3. **Regra de roteamento super simples**
-    
-    - Se língua detectada = Idioma A → traduz para Idioma B.
-        
-    - Se língua detectada = Idioma B → traduz para Idioma A.
-        
-    - Se for alguma outra língua (alguém aleatório entrou falando alemão), você pode:
-        
-        - Ignorar, ou
-            
-        - Só traduzir para um dos lados (decisão de produto).
-            
-4. **Tradução**
-    
-    - Chama a API de tradução:
-        
-        - `"We need to ship by Friday"` → `"A gente precisa entregar isso até sexta-feira."`
-            
-5. **TTS**
-    
-    - Texto traduzido → TTS no idioma alvo:
-        
-        - Saída = áudio pronto, por ex. em `pt-BR` com voz natural.
-            
-6. **Bot fala na call**
-    
-    - Bot segura o microfone dele fechado.
-        
-    - Quando recebe um áudio TTS:
-        
-        - Abre o mic.
-            
-        - Toca o áudio (como se fosse uma pessoa falando).
-            
-        - Fecha o mic de novo.
-            
+1. **Google Cloud Credentials**
+   ```bash
+   # Download your service account JSON and set the path
+   export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/credentials.json"
+   ```
 
-Pronto. É isso o “núcleo” do MVP.
+2. **OpenAI API Key**
+   ```bash
+   # Create .env file in services/integration/
+   echo "OPENAI_API_KEY=sk-your-key-here" > services/integration/.env
+   ```
 
----
+### Running the Services
 
-## 3. Quem manda em quem
+```bash
+# Terminal 1: Start Orchestrator
+cd services/orchestrator
+node src/index.js
 
-Você comentou:
+# Terminal 2: Start Integration Service
+cd services/integration
+source .venv/bin/activate
+python src/main.py
 
-> O host pode ser quem for, ele só precisa aceitar o bot na call que ele vai fazer o que a pessoa q tem o app manda.
+# Terminal 3: Start localtunnel (for Chrome extension access)
+npx lt --port 3001 --subdomain mgtranslate
+```
 
-Então:
+### Installing the Chrome Extension
 
-- **“Dono do app”** = o cara que loga, escolhe reunião e aperta Start/Stop.
-    
-- **Host** da call (no Meet) pode ser qualquer um:
-    
-    - Pode nem saber o que é seu app.
-        
-    - Só precisa clicar em “Aceitar” quando o bot pedir entrada.
-        
-- Depois de aceito:
-    
-    - O app de controle pode mandar comandos pro bot:
-        
-        - Start/Stop.
-            
-        - Pausar tradução.
-            
-        - Trocar idiomas em runtime (se você quiser suportar).
-            
+1. Open Chrome and go to `chrome://extensions`
+2. Enable **Developer mode** (toggle in top-right)
+3. Click **Load unpacked**
+4. Select the `extension/` folder
+5. The MGtranslate icon should appear in your toolbar
 
----
+### Using the Extension
 
-## 4. Stack de IA – qual combo faz mais sentido pro MVP
+1. Join a Google Meet call
+2. Click the MGtranslate extension icon
+3. Select your languages (e.g., Portuguese ↔ English)
+4. Click **Start Translation**
+5. When prompted, share the current tab with **audio enabled**
+6. Start speaking - translations will play automatically!
 
-Aqui entra a parte “não é muito a minha área” – então vamos escolher com alguns critérios:  
-**latência, qualidade, custo e simplicidade de integrar**.
+## Project Structure
 
-### 4.1. Opção que eu recomendo pro MVP: 100% Google Cloud
+```
+MGtranslate/
+├── extension/               # Chrome Extension
+│   ├── manifest.json       # Extension configuration
+│   ├── content.js          # Audio capture & playback
+│   ├── popup.html/js       # User interface
+│   └── background.js       # Service worker
+│
+├── services/
+│   ├── orchestrator/       # Message routing (Node.js)
+│   │   └── src/index.js    # WebSocket server
+│   │
+│   └── integration/        # STT/Translation/TTS (Python)
+│       ├── src/main.py     # Main service
+│       └── requirements.txt
+│
+├── docs/                   # Additional documentation
+├── ARCHITECTURE.md         # Detailed architecture docs
+├── KNOWN_ISSUES.md         # Known issues & solutions
+└── README.md               # This file
+```
 
-**Por quê?**
+## Configuration Options
 
-- Você já está em cima do ecossistema Google (Meet).
-    
-- Um provedor só: **Speech-to-Text + Translate + Text-to-Speech** tudo no mesmo lugar.
-    
-- Todos os idiomas que você quer estão cobertos:
-    
-    - Speech-to-Text: suporta +100 idiomas, incluindo **pt-BR, en, es, zh, ja, ko**.[Google Cloud+1](https://cloud.google.com/speech-to-text?utm_source=chatgpt.com)
-        
-    - Translate: cobre mais de 100 idiomas, incluindo todos esses; é estável e barato.[blog.google](https://blog.google/products/translate/language-learning-live-translate/?utm_source=chatgpt.com)
-        
-    - Text-to-Speech: mais de **75 idiomas/variações** e 380+ vozes, incluindo vozes naturais em **Mandarim, Japonês, Coreano, Espanhol, Português** etc.[Google Cloud+1](https://cloud.google.com/text-to-speech?utm_source=chatgpt.com)
-        
+### Integration Service (`services/integration/src/main.py`)
 
-**Pipeline ficaria:**
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `MIN_BUFFER_SIZE` | 64000 (~2s) | Minimum audio before processing |
+| `MAX_BUFFER_SIZE` | 960000 (~30s) | Maximum buffer for long speeches |
+| `BUFFER_TIMEOUT` | 5.0s | Process after this silence duration |
+| `MAX_CONTEXT_SIZE` | 6 | Number of exchanges to remember |
+| `MIN_CONFIDENCE` | 0.5 | STT confidence threshold |
 
-- **STT:** Google Cloud Speech-to-Text (streaming).
-    
-- **Tradução:** Google Cloud Translation.
-    
-- **TTS:** Google Cloud Text-to-Speech.
-    
+### Supported Languages
 
-Vantagens:
+Currently optimized for:
+- Portuguese (Brazil) ↔ English (US)
 
-- Tempo de desenvolvimento menor (SDKs prontos).
-    
-- Um painel só de billing.
-    
-- Documentação bem decente.
-    
+The system can be extended to support additional languages by modifying the STT configuration.
 
-Desvantagens:
+## Troubleshooting
 
-- Dados passam pela nuvem Google (ponto de atenção de privacidade).
-    
-- Latência boa, mas não é “local na GPU”; para a maioria dos casos de reunião, é aceitável.
-    
+### Extension not connecting
+```bash
+# Check if localtunnel is running
+curl https://mg.falconsoft.dev/health
+# Should return: {"status":"ok"}
+```
 
-### 4.2. Opção “premium de voz”: Google + ElevenLabs
+### No translation output
+```bash
+# Check integration service logs
+tail -f /tmp/integration.log
+```
 
-Se você quiser:
+### Audio not being captured
+- Make sure you selected "Share tab audio" when prompted
+- Check Chrome console (F12) for error messages
+- Reload the extension in `chrome://extensions`
 
-- STT + tradução com Google.
-    
-- **Voz MUITO natural** (quase dublagem de filme) com ElevenLabs.
-    
+See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for more detailed troubleshooting.
 
-ElevenLabs Multilingual v2 suporta 29+ línguas, incluindo **Português (Brasil e Portugal), Espanhol (Espanha/México), Japonês, Coreano, Chinês, Inglês** etc.[ElevenLabs+2ElevenLabs+2](https://help.elevenlabs.io/hc/en-us/articles/13313366263441-What-languages-do-you-support?utm_source=chatgpt.com)
+## API Costs
 
-**Pipeline:**
+| Service | Provider | Approximate Cost |
+|---------|----------|------------------|
+| Speech-to-Text | Google Cloud | ~$0.006 per 15 seconds |
+| Translation | OpenAI GPT-4o-mini | ~$0.15 per 1M tokens |
+| Text-to-Speech | Google Cloud | ~$4 per 1M characters |
 
-- STT: Google Speech-to-Text.
-    
-- Tradução: Google Translate (ou DeepL se quiser melhor nuance em texto). DeepL cobre PT, EN, ES, ZH, JA, KO etc.[DeepL Suporte+2DeepL Documentation+2](https://support.deepl.com/hc/en-us/articles/360019925219-DeepL-Translator-languages?utm_source=chatgpt.com)
-    
-- TTS: ElevenLabs (voz incrível).
-    
+For a typical 1-hour meeting with moderate conversation, expect costs around $1-3.
 
-Prós:
+## Contributing
 
-- Experiência de áudio absurda de boa (voz bem humana).
-    
-- Ainda fácil de integrar (APIs bem documentadas).[ElevenLabs+1](https://elevenlabs.io/docs/capabilities/text-to-speech?utm_source=chatgpt.com)
-    
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
-Contras:
+## License
 
-- Custa mais (Google + ElevenLabs).
-    
-- Mais moving parts (dois provedores, duas faturas).
-    
+[Add your license here]
 
-### 4.3. Opção “hardcore dev” / self-host: tudo local
+## Acknowledgments
 
-Só pra deixar registrado, se um dia você quiser:
-
-- **Whisper** (local) para STT (roda bem em GPU, suporta dezenas de línguas e é robusto em áudio ruim).[Tomedes](https://www.tomedes.com/translator-hub/whisper-vs-google-speech-to-text?utm_source=chatgpt.com)
-    
-- Um LLM local ou biblioteca dedicada para tradução (por ex. modelos baseados em Mistral/Qwen treinados para tradução).
-    
-- TTS local: Coqui / Piper / VITS / outros.
-    
-
-Prós:
-
-- Privacidade máxima (tudo on-prem).
-    
-- Custo de API = zero, só infra.
-    
-
-Contras:
-
-- Muito mais trabalho de engenharia.
-    
-- Tunagem de latência é vergonhosamente trabalhosa (streaming, quantização, etc).
-    
-
-**Pra esse MVP seu, eu não iria por aí de cara.**
+- Google Cloud Speech & Text-to-Speech APIs
+- OpenAI GPT-4o-mini for natural translations
+- The localtunnel project for development tunneling
 
 ---
 
-## 5. MVP final em 6 etapas
-
-Pra ficar redondo:
-
-1. **Configuração**
-    
-    - App: escolher Idioma A / Idioma B, colar link do Meet.
-        
-2. **Spawn do bot**
-    
-    - Backend sobe Chromium headless logado na conta do bot.
-        
-    - Bot entra no Meet → Host aceita.
-        
-3. **Audio in**
-    
-    - Bot captura áudio da call em streaming, manda pro backend.
-        
-4. **Processamento**
-    
-    - STT (multi-idioma A + B) → detecta idioma.
-        
-    - Tradução A→B ou B→A.
-        
-    - TTS no idioma alvo.
-        
-5. **Audio out**
-    
-    - Backend manda áudio sintetizado de volta pro bot.
-        
-    - Bot abre mic, fala, fecha mic.
-        
-6. **Controle**
-    
-    - Usuário do app pode:
-        
-        - Start/Stop sessão.
-            
-        - Pausar tradução.
-            
-        - Trocar pares de idioma entre uma reunião e outra.
-            
-
-Sem fallback, sem transcript bonito, sem DOM do Meet, sem levantar mão.  
-Só um intérprete robô fazendo o trabalho dele: **colar gente que não fala a mesma língua numa call do Meet.**
-
-Mais pra frente, quando esse esqueleto estiver rodando liso, fica trivial você plugar coisas “de luxo” em cima (logs, sumarização com LLM, modo conference, multi-idiomas, etc.).
+For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).

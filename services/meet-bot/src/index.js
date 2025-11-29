@@ -181,7 +181,12 @@ class MeetBot {
           '--disable-features=LockProfileCookieDatabase',
           '--window-size=1280,720',
         ],
-        defaultViewport: { width: 1280, height: 720 }
+        defaultViewport: { width: 1280, height: 720 },
+        env: {
+          ...process.env,
+          DISPLAY: process.env.DISPLAY || ':99',
+          XAUTHORITY: process.env.XAUTHORITY || '/tmp/xvfb-run.fpK8xJ/Xauthority'
+        }
       });
 
       this.page = await this.browser.newPage();

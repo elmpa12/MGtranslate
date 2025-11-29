@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #333;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #4ade80;
+    }
+
+    .logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #4ade80, #22c55e);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: #1a1a2e;
+    }
+
+    .status {
+      background: #2a2a3e;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .status-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .status-label {
+      color: #888;
+      font-size: 12px;
+    }
+
+    .status-value {
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .status-value.connected {
+      background: #22c55e33;
+      color: #4ade80;
+    }
+
+    .status-value.disconnected {
+      background: #ef444433;
+      color: #f87171;
+    }
+
+    .status-value.translating {
+      background: #3b82f633;
+      color: #60a5fa;
+    }
+
+    .languages {
+      margin-bottom: 16px;
+    }
+
+    .lang-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .lang-row label {
+      font-size: 12px;
+      color: #888;
+      width: 50px;
+    }
+
+    .lang-row select {
+      flex: 1;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background: #2a2a3e;
+      color: #eee;
+      font-size: 13px;
+    }
+
+    .swap-btn {
+      background: #333;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #888;
+      font-size: 16px;
+    }
+
+    .swap-btn:hover {
+      background: #444;
+      color: #eee;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4ade80, #22c55e);
+      color: #1a1a2e;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
+    }
+
+    .btn-primary:disabled {
+      background: #333;
+      color: #666;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .transcripts {
+      margin-top: 16px;
+      max-height: 150px;
+      overflow-y: auto;
+      background: #2a2a3e;
+      border-radius: 8px;
+      padding: 8px;
+    }
+
+    .transcript {
+      font-size: 11px;
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      border-radius: 4px;
+      background: #1a1a2e;
+    }
+
+    .transcript .original {
+      color: #888;
+    }
+
+    .transcript .translated {
+      color: #4ade80;
+      margin-top: 2px;
+    }
+
+    .not-meet {
+      text-align: center;
+      padding: 20px;
+      color: #888;
+    }
+
+    .not-meet h2 {
+      color: #eee;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">M</div>
+    <h1>MGtranslate</h1>
+  </div>
+
+  <div id="main-content">
+    <div class="status">
+      <div class="status-row">
+        <span class="status-label">Backend</span>
+        <span id="backend-status" class="status-value disconnected">Disconnected</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Meet</span>
+        <span id="meet-status" class="status-value disconnected">Not in call</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Translation</span>
+        <span id="translation-status" class="status-value disconnected">Inactive</span>
+      </div>
+    </div>
+
+    <div class="languages">
+      <div class="lang-row">
+        <label>From:</label>
+        <select id="source-lang">
+          <option value="en-US">English</option>
+          <option value="pt-BR">Portuguese</option>
+          <option value="es-ES">Spanish</option>
+          <option value="fr-FR">French</option>
+          <option value="de-DE">German</option>
+          <option value="it-IT">Italian</option>
+          <option value="ja-JP">Japanese</option>
+          <option value="ko-KR">Korean</option>
+          <option value="zh-CN">Chinese</option>
+        </select>
+        <button class="swap-btn" id="swap-langs">⇄</button>
+      </div>
+      <div class="lang-row">
+        <label>To:</label>
+        <select id="target-lang">
+          <option value="pt-BR">Portuguese</option>
+          <option value="en-US">English</option>
+          <option value="es-ES">Spanish</option>
+          <option value="fr-FR">French</option>
+          <option value="de-DE">German</option>
+          <option value="it-IT">Italian</option>
+          <option value="ja-JP">Japanese</option>
+          <option value="ko-KR">Korean</option>
+          <option value="zh-CN">Chinese</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="start-btn" class="btn btn-primary">Start Translation</button>
+      <button id="stop-btn" class="btn btn-danger" style="display: none;">Stop</button>
+    </div>
+
+    <div class="transcripts" id="transcripts" style="display: none;">
+      <!-- Transcripts will be added here -->
+    </div>
+  </div>
+
+  <div id="not-meet" class="not-meet" style="display: none;">
+    <h2>Not in Google Meet</h2>
+    <p>Open a Google Meet call to use MGtranslate</p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
