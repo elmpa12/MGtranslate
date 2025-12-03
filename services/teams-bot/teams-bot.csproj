@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Microsoft Graph Communications SDK -->
+    <PackageReference Include="Microsoft.Graph.Communications.Calls" Version="1.2.0.5500" />
+    <PackageReference Include="Microsoft.Graph.Communications.Calls.Media" Version="1.2.0.5500" />
+    <PackageReference Include="Microsoft.Graph.Communications.Common" Version="1.2.0.5500" />
+    <PackageReference Include="Microsoft.Graph.Communications.Core" Version="1.2.0.5500" />
+
+    <!-- Bot Media SDK (requires Windows) -->
+    <PackageReference Include="Microsoft.Skype.Bots.Media" Version="1.23.0.66-alpha" />
+
+    <!-- Azure Identity -->
+    <PackageReference Include="Azure.Identity" Version="1.10.4" />
+
+    <!-- WebSocket for translation pipeline -->
+    <PackageReference Include="System.Net.WebSockets.Client" Version="4.3.2" />
+
+    <!-- JSON handling -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+
+    <!-- Logging -->
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
+  </ItemGroup>
+
+</Project>
