@@ -15,6 +15,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
 import pino from 'pino';
+import { spawn } from 'child_process';
 
 puppeteer.use(StealthPlugin());
 
@@ -487,11 +488,16 @@ class MeetBot {
       try {
         const audio = await this.page.evaluate(() => window.__mgGetAndClearChunks?.());
         if (audio) {
+          const pcm = await decodeWebmToPcm(audio);
+          if (!pcm) {
+            log.warn({ sessionId: this.sessionId }, 'Failed to decode WebM to PCM, skipping chunk');
+            return;
+          }
           sendToOrchestrator({
             type: 'bot:audio',
             sessionId: this.sessionId,
-            audio,
-            format: 'webm'
+            audio: pcm.toString('base64'),
+            format: 'pcm16'
           });
         }
       } catch (err) {
@@ -624,3 +630,40 @@ process.on('SIGINT', async () => {
   }
   process.exit(0);
 });
+
+// ================================
+// Audio decoding helper
+// ================================
+
+function decodeWebmToPcm(audioB64) {
+  return new Promise((resolve) => {
+    const input = Buffer.from(audioB64, 'base64');
+
+    const ffmpeg = spawn('ffmpeg', [
+      '-loglevel', 'error',
+      '-f', 'webm',
+      '-i', 'pipe:0',
+      '-ac', '1',
+      '-ar', '16000',
+      '-f', 's16le',
+      'pipe:1'
+    ]);
+
+    const chunks = [];
+    let error = '';
+
+    ffmpeg.stdout.on('data', (d) => chunks.push(d));
+    ffmpeg.stderr.on('data', (d) => { error += d.toString(); });
+
+    ffmpeg.on('close', (code) => {
+      if (code !== 0) {
+        log.error({ code, error }, 'ffmpeg decode failed');
+        return resolve(null);
+      }
+      return resolve(Buffer.concat(chunks));
+    });
+
+    ffmpeg.stdin.write(input);
+    ffmpeg.stdin.end();
+  });
+}

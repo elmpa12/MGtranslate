@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MGtranslate Media API Client</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #eee;
+    }
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+      background: #16213e;
+    }
+    .status.connected { background: #0f3d0f; }
+    .status.error { background: #3d0f0f; }
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin: 20px 0;
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      background: #4a90d9;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover { background: #357abd; }
+    button:disabled { background: #555; cursor: not-allowed; }
+    .audio-streams {
+      display: grid;
+      gap: 10px;
+    }
+    .participant {
+      background: #16213e;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .audio-level {
+      height: 4px;
+      background: #333;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .audio-level-bar {
+      height: 100%;
+      background: #4caf50;
+      width: 0%;
+      transition: width 0.1s;
+    }
+    #log {
+      background: #0d0d1a;
+      padding: 10px;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>MGtranslate Media API</h1>
+
+  <div id="session-status" class="status">Status: Not connected</div>
+
+  <div class="controls">
+    <select id="source-lang">
+      <option value="en-US">English (Source)</option>
+      <option value="pt-BR">Portuguese (Source)</option>
+    </select>
+    <span>→</span>
+    <select id="target-lang">
+      <option value="pt-BR">Portuguese (Target)</option>
+      <option value="en-US">English (Target)</option>
+    </select>
+    <button id="btn-connect" onclick="connect()">Connect to Meeting</button>
+    <button id="btn-disconnect" onclick="disconnect()" disabled>Disconnect</button>
+  </div>
+
+  <h3>Translations</h3>
+  <div id="translations" class="translations"></div>
+
+  <style>
+    .translations {
+      background: #16213e;
+      padding: 15px;
+      border-radius: 4px;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-bottom: 20px;
+    }
+    .translation-item {
+      padding: 10px;
+      margin: 8px 0;
+      background: #0d0d1a;
+      border-radius: 4px;
+      border-left: 3px solid #4a90d9;
+    }
+    .translation-item .original {
+      color: #888;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .translation-item .translated {
+      color: #4caf50;
+      font-weight: 500;
+    }
+    select {
+      padding: 10px;
+      border: none;
+      border-radius: 4px;
+      background: #16213e;
+      color: white;
+    }
+  </style>
+
+  <h3>Audio Streams</h3>
+  <div id="audio-streams" class="audio-streams">
+    <div class="participant">
+      <span>No participants yet</span>
+    </div>
+  </div>
+
+  <!-- Hidden audio elements for playback (optional) -->
+  <audio id="audio-1" autoplay style="display:none;"></audio>
+  <audio id="audio-2" autoplay style="display:none;"></audio>
+  <audio id="audio-3" autoplay style="display:none;"></audio>
+
+  <h3>Log</h3>
+  <div id="log"></div>
+
+  <!-- Load bundled SDK -->
+  <script src="/meet-client.bundle.js"></script>
+  <script>
+    // Configuration passed from server
+    const config = window.MGTRANSLATE_CONFIG || {
+      orchestratorWs: 'ws://localhost:3001/ws',
+      accessToken: null,
+      meetingCode: null
+    };
+
+    let client = null;
+    let ws = null;
+    let audioContext = null;
+    const audioProcessors = new Map();
+
+    function log(message) {
+      const logEl = document.getElementById('log');
+      const time = new Date().toLocaleTimeString();
+      logEl.innerHTML += `[${time}] ${message}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(`[MGtranslate] ${message}`);
+    }
+
+    function setStatus(message, className = '') {
+      const statusEl = document.getElementById('session-status');
+      statusEl.textContent = `Status: ${message}`;
+      statusEl.className = `status ${className}`;
+    }
+
+    // Get selected languages
+    function getSourceLang() {
+      return document.getElementById('source-lang').value;
+    }
+
+    function getTargetLang() {
+      return document.getElementById('target-lang').value;
+    }
+
+    // Add translation to UI
+    function addTranslation(original, translated) {
+      const container = document.getElementById('translations');
+      const div = document.createElement('div');
+      div.className = 'translation-item';
+      div.innerHTML = `
+        <div class="original">${original}</div>
+        <div class="translated">${translated}</div>
+      `;
+      container.insertBefore(div, container.firstChild);
+
+      // Keep only last 20 translations
+      while (container.children.length > 20) {
+        container.removeChild(container.lastChild);
+      }
+    }
+
+    // Play TTS audio
+    let ttsAudio = null;
+    function playTTS(audioUrl) {
+      try {
+        if (ttsAudio) {
+          ttsAudio.pause();
+        }
+        ttsAudio = new Audio(audioUrl);
+        ttsAudio.play().catch(e => log(`TTS play error: ${e.message}`));
+      } catch (e) {
+        log(`TTS error: ${e.message}`);
+      }
+    }
+
+    // Connect to orchestrator WebSocket
+    function connectOrchestrator() {
+      if (ws && ws.readyState === WebSocket.OPEN) return;
+
+      ws = new WebSocket(config.orchestratorWs);
+
+      ws.onopen = () => {
+        log('Connected to orchestrator');
+        // Register as 'audio_processor' to receive translation broadcasts
+        ws.send(JSON.stringify({
+          type: 'register',
+          clientType: 'audio_processor',
+          clientId: `media-api-${config.meetingCode}`,
+          meetingId: config.meetingCode
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        log(`Orchestrator message: ${data.type}`);
+
+        // Handle translation results
+        if (data.type === 'translation') {
+          addTranslation(data.originalText, data.translatedText);
+
+          // Play TTS audio if provided
+          if (data.audioUrl) {
+            playTTS(data.audioUrl);
+          }
+        }
+      };
+
+      ws.onerror = (error) => {
+        log(`Orchestrator error: ${error.message || 'Unknown'}`);
+      };
+
+      ws.onclose = () => {
+        log('Disconnected from orchestrator');
+      };
+    }
+
+    // Process audio track and send to orchestrator
+    function processAudioTrack(track, participantId) {
+      if (!audioContext) {
+        audioContext = new AudioContext({ sampleRate: 16000 });
+      }
+
+      const mediaStream = new MediaStream([track]);
+      const source = audioContext.createMediaStreamSource(mediaStream);
+
+      // Create a script processor to capture audio data
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      processor.onaudioprocess = (e) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          const inputData = e.inputBuffer.getChannelData(0);
+
+          // Convert float32 to int16
+          const int16Data = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            int16Data[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+          }
+
+          // Send audio data with language settings
+          ws.send(JSON.stringify({
+            type: 'audio',
+            source: 'media-api',
+            participantId: participantId,
+            data: btoa(String.fromCharCode.apply(null, new Uint8Array(int16Data.buffer))),
+            format: 'pcm16',
+            sampleRate: 16000,
+            sourceLang: getSourceLang(),
+            targetLang: getTargetLang()
+          }));
+        }
+      };
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      audioProcessors.set(participantId, { source, processor });
+      log(`Audio processor created for participant: ${participantId}`);
+    }
+
+    // Handle stream changes
+    function handleStreamChange(meetStreamTracks) {
+      const streamsEl = document.getElementById('audio-streams');
+      streamsEl.innerHTML = '';
+
+      meetStreamTracks.forEach((track) => {
+        if (track.mediaStreamTrack.kind === 'audio') {
+          const participantId = track.mediaStreamTrack.id;
+
+          // Create UI element
+          const div = document.createElement('div');
+          div.className = 'participant';
+          div.innerHTML = `
+            <span>Participant: ${participantId.substring(0, 8)}...</span>
+            <div class="audio-level">
+              <div class="audio-level-bar" id="level-${participantId}"></div>
+            </div>
+          `;
+          streamsEl.appendChild(div);
+
+          // Process audio if not already processing
+          if (!audioProcessors.has(participantId)) {
+            processAudioTrack(track.mediaStreamTrack, participantId);
+          }
+
+          log(`Audio track added: ${participantId}`);
+        }
+      });
+
+      if (meetStreamTracks.length === 0) {
+        streamsEl.innerHTML = '<div class="participant"><span>No participants yet</span></div>';
+      }
+    }
+
+    // Handle session status changes
+    function handleSessionChange(status) {
+      const MeetConnectionState = window.MeetMediaClient.MeetConnectionState;
+      switch (status.connectionState) {
+        case MeetConnectionState.WAITING:
+          setStatus('Waiting...');
+          break;
+        case MeetConnectionState.JOINED:
+          setStatus('Connected to meeting', 'connected');
+          document.getElementById('btn-connect').disabled = true;
+          document.getElementById('btn-disconnect').disabled = false;
+          break;
+        case MeetConnectionState.DISCONNECTED:
+          setStatus('Disconnected');
+          document.getElementById('btn-connect').disabled = false;
+          document.getElementById('btn-disconnect').disabled = true;
+          break;
+        default:
+          setStatus(`State: ${status.connectionState}`);
+      }
+      log(`Session state: ${status.connectionState}`);
+    }
+
+    // Connect to meeting
+    window.connect = async function() {
+      if (!config.accessToken || !config.meetingCode) {
+        log('Missing access token or meeting code');
+        setStatus('Configuration error', 'error');
+        return;
+      }
+
+      setStatus('Connecting...');
+      connectOrchestrator();
+
+      try {
+        // Use the bundled SDK
+        const { MeetMediaApiClientImpl } = window.MeetMediaClient;
+
+        client = new MeetMediaApiClientImpl({
+          meetingSpaceId: config.meetingCode,
+          numberOfVideoStreams: 0, // Audio only
+          enableAudioStreams: true,
+          accessToken: config.accessToken
+        });
+
+        client.sessionStatus.subscribe(handleSessionChange);
+        client.meetStreamTracks.subscribe(handleStreamChange);
+
+        log('Joining meeting...');
+        await client.joinMeeting();
+        log('Join meeting request sent');
+
+      } catch (error) {
+        log(`Error: ${error.message}`);
+        console.error(error);
+        setStatus('Connection failed', 'error');
+      }
+    };
+
+    // Disconnect from meeting
+    window.disconnect = async function() {
+      if (client) {
+        await client.leaveMeeting();
+        log('Left meeting');
+      }
+
+      // Clean up audio processors
+      audioProcessors.forEach(({ source, processor }) => {
+        source.disconnect();
+        processor.disconnect();
+      });
+      audioProcessors.clear();
+
+      if (ws) {
+        ws.close();
+      }
+
+      setStatus('Disconnected');
+    };
+
+    // Auto-connect if config is provided
+    if (config.accessToken && config.meetingCode) {
+      log('Auto-connecting with provided config...');
+      setTimeout(() => connect(), 1000);
+    }
+
+    // Cookie Consent
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return null;
+    }
+
+    function setCookie(name, value, days) {
+      const expires = new Date(Date.now() + days * 864e5).toUTCString();
+      document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Lax`;
+    }
+
+    window.acceptCookies = function() {
+      setCookie('cookie_consent', 'accepted', 365);
+      document.getElementById('cookie-consent').style.display = 'none';
+    }
+
+    window.declineCookies = function() {
+      setCookie('cookie_consent', 'declined', 365);
+      document.getElementById('cookie-consent').style.display = 'none';
+    }
+
+    // Show banner if no consent given
+    if (!getCookie('cookie_consent')) {
+      document.getElementById('cookie-consent').style.display = 'block';
+    }
+  </script>
+
+  <!-- Cookie Consent Banner -->
+  <div id="cookie-consent" style="
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(22, 33, 62, 0.98);
+    backdrop-filter: blur(10px);
+    padding: 20px;
+    z-index: 9999;
+    border-top: 1px solid rgba(74, 144, 217, 0.3);
+    display: none;
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.3);
+  ">
+    <div style="max-width: 800px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+      <div style="flex: 1; min-width: 250px;">
+        <p style="margin: 0; color: #a0a0a0; font-size: 0.9rem;">
+          We use cookies to enhance your experience. By continuing to use this site you agree to our use of cookies.
+          <a href="https://falconsoft.dev/privacy" style="color: #4a90d9; text-decoration: underline;">Learn more</a>
+        </p>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button onclick="declineCookies()" style="
+          padding: 8px 20px;
+          border: 1px solid #666;
+          background: transparent;
+          color: #888;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 0.85rem;
+        ">Decline</button>
+        <button onclick="acceptCookies()" style="
+          padding: 8px 20px;
+          border: none;
+          background: #4a90d9;
+          color: white;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 0.85rem;
+          font-weight: 600;
+        ">Accept All</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

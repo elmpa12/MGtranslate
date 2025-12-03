@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Falcon Soft - Custom software engineering solutions. We build scalable applications, AI integrations, and enterprise systems.">
+    <meta name="keywords" content="software engineering, custom software, AI integration, enterprise solutions, web development">
+    <title>Falcon Soft | Software Engineering Solutions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #0f172a;
+            --accent: #06b6d4;
+            --text: #334155;
+            --text-light: #64748b;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --border: #e2e8f0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text);
+            line-height: 1.6;
+            background: var(--bg);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+        }
+
+        nav .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 72px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--secondary);
+            text-decoration: none;
+        }
+
+        .logo svg {
+            width: 40px;
+            height: 40px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-outline:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 160px 0 100px;
+            background: linear-gradient(135deg, var(--bg) 0%, var(--bg-alt) 100%);
+        }
+
+        .hero .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .hero-content h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: var(--secondary);
+            line-height: 1.2;
+            margin-bottom: 24px;
+        }
+
+        .hero-content h1 span {
+            color: var(--primary);
+        }
+
+        .hero-content p {
+            font-size: 1.25rem;
+            color: var(--text-light);
+            margin-bottom: 32px;
+            max-width: 500px;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+        }
+
+        .hero-visual {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .hero-graphic {
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 1;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 25px 50px -12px rgba(37, 99, 235, 0.25);
+        }
+
+        .hero-graphic svg {
+            width: 60%;
+            height: 60%;
+            color: white;
+        }
+
+        /* Services Section */
+        .services {
+            padding: 100px 0;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            color: var(--secondary);
+            margin-bottom: 16px;
+        }
+
+        .section-header p {
+            color: var(--text-light);
+            font-size: 1.125rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 32px;
+        }
+
+        .service-card {
+            padding: 32px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            transition: all 0.3s;
+        }
+
+        .service-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.1);
+            border-color: var(--primary);
+        }
+
+        .service-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .service-icon svg {
+            width: 28px;
+            height: 28px;
+            color: white;
+        }
+
+        .service-card h3 {
+            font-size: 1.25rem;
+            color: var(--secondary);
+            margin-bottom: 12px;
+        }
+
+        .service-card p {
+            color: var(--text-light);
+        }
+
+        /* Products Section */
+        .products {
+            padding: 100px 0;
+            background: var(--bg-alt);
+        }
+
+        .product-showcase {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .product-info h3 {
+            font-size: 2rem;
+            color: var(--secondary);
+            margin-bottom: 16px;
+        }
+
+        .product-info p {
+            color: var(--text-light);
+            margin-bottom: 24px;
+        }
+
+        .product-features {
+            list-style: none;
+            margin-bottom: 32px;
+        }
+
+        .product-features li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            color: var(--text);
+        }
+
+        .product-features li svg {
+            width: 20px;
+            height: 20px;
+            color: var(--accent);
+        }
+
+        .product-visual {
+            background: linear-gradient(135deg, var(--secondary) 0%, #1e293b 100%);
+            border-radius: 16px;
+            padding: 40px;
+            aspect-ratio: 4/3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .product-visual img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+        }
+
+        /* About Section */
+        .about {
+            padding: 100px 0;
+        }
+
+        .about-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .about-text h2 {
+            font-size: 2.5rem;
+            color: var(--secondary);
+            margin-bottom: 24px;
+        }
+
+        .about-text p {
+            color: var(--text-light);
+            margin-bottom: 16px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-top: 40px;
+        }
+
+        .stat-item {
+            padding: 24px;
+            background: var(--bg-alt);
+            border-radius: 12px;
+        }
+
+        .stat-item h4 {
+            font-size: 2.5rem;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .stat-item p {
+            color: var(--text-light);
+            margin: 0;
+        }
+
+        /* Contact Section */
+        .contact {
+            padding: 100px 0;
+            background: var(--secondary);
+            color: white;
+        }
+
+        .contact .section-header h2 {
+            color: white;
+        }
+
+        .contact .section-header p {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .contact-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+        }
+
+        .contact-info h3 {
+            font-size: 1.5rem;
+            margin-bottom: 24px;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .contact-item svg {
+            width: 24px;
+            height: 24px;
+            color: var(--accent);
+        }
+
+        .contact-item a {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+        }
+
+        .contact-item a:hover {
+            color: white;
+        }
+
+        .contact-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .contact-form input,
+        .contact-form textarea {
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .contact-form input::placeholder,
+        .contact-form textarea::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .contact-form textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .contact-form .btn {
+            align-self: flex-start;
+        }
+
+        /* Footer */
+        footer {
+            padding: 40px 0;
+            background: #0a0f1a;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 24px;
+        }
+
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+        }
+
+        .footer-links a:hover {
+            color: white;
+        }
+
+        /* Responsive */
+        @media (max-width: 968px) {
+            .hero .container,
+            .product-showcase,
+            .about-content,
+            .contact-content {
+                grid-template-columns: 1fr;
+            }
+
+            .services-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .hero-content h1 {
+                font-size: 2.5rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .services-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+            }
+
+            .footer-content {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="container">
+            <a href="/" class="logo">
+                <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="40" height="40" rx="8" fill="#2563eb"/>
+                    <path d="M20 8L32 20L20 32L8 20L20 8Z" fill="white" fill-opacity="0.9"/>
+                    <path d="M20 12L28 20L20 28L12 20L20 12Z" fill="#2563eb"/>
+                    <circle cx="20" cy="20" r="4" fill="white"/>
+                </svg>
+                Falcon Soft
+            </a>
+            <ul class="nav-links">
+                <li><a href="#services">Services</a></li>
+                <li><a href="#products">Products</a></li>
+                <li><a href="#about">About</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+            <a href="#contact" class="btn btn-primary">Get Started</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1>Building <span>Intelligent</span> Software Solutions</h1>
+                <p>We craft custom software that empowers businesses with cutting-edge technology, from AI integrations to enterprise-grade applications.</p>
+                <div class="hero-buttons">
+                    <a href="#contact" class="btn btn-primary">Start Your Project</a>
+                    <a href="#services" class="btn btn-outline">Our Services</a>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="hero-graphic">
+                    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4" opacity="0.3"/>
+                        <circle cx="50" cy="50" r="25" stroke="currentColor" stroke-width="2" opacity="0.5"/>
+                        <circle cx="50" cy="50" r="8" fill="currentColor"/>
+                        <path d="M50 10V25M50 75V90M10 50H25M75 50H90" stroke="currentColor" stroke-width="2" opacity="0.5"/>
+                        <circle cx="50" cy="10" r="4" fill="currentColor"/>
+                        <circle cx="50" cy="90" r="4" fill="currentColor"/>
+                        <circle cx="10" cy="50" r="4" fill="currentColor"/>
+                        <circle cx="90" cy="50" r="4" fill="currentColor"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Services Section -->
+    <section id="services" class="services">
+        <div class="container">
+            <div class="section-header">
+                <h2>Our Services</h2>
+                <p>End-to-end software engineering solutions tailored to your business needs</p>
+            </div>
+            <div class="services-grid">
+                <div class="service-card">
+                    <div class="service-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2"/>
+                            <path d="M8 21h8M12 17v4"/>
+                        </svg>
+                    </div>
+                    <h3>Custom Software Development</h3>
+                    <p>Tailored applications built from scratch to solve your unique business challenges with modern architectures.</p>
+                </div>
+                <div class="service-card">
+                    <div class="service-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                            <path d="M2 17l10 5 10-5"/>
+                            <path d="M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <h3>AI & Machine Learning</h3>
+                    <p>Integrate intelligent features into your products with custom AI models, NLP, and automation solutions.</p>
+                </div>
+                <div class="service-card">
+                    <div class="service-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                            <path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/>
+                        </svg>
+                    </div>
+                    <h3>Cloud Architecture</h3>
+                    <p>Design and deploy scalable cloud infrastructure on AWS, GCP, or Azure with DevOps best practices.</p>
+                </div>
+                <div class="service-card">
+                    <div class="service-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                            <path d="M22 6l-10 7L2 6"/>
+                        </svg>
+                    </div>
+                    <h3>API Development</h3>
+                    <p>Build robust REST and GraphQL APIs with comprehensive documentation and seamless third-party integrations.</p>
+                </div>
+                <div class="service-card">
+                    <div class="service-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                    </div>
+                    <h3>Real-Time Systems</h3>
+                    <p>WebSocket-based applications, live streaming, real-time collaboration tools, and event-driven architectures.</p>
+                </div>
+                <div class="service-card">
+                    <div class="service-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                    </div>
+                    <h3>Security & Compliance</h3>
+                    <p>Secure software development with OAuth2, encryption, and compliance with GDPR, SOC2, and industry standards.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Products Section -->
+    <section id="products" class="products">
+        <div class="container">
+            <div class="section-header">
+                <h2>Our Products</h2>
+                <p>Innovative solutions we've built to solve real-world problems</p>
+            </div>
+            <div class="product-showcase">
+                <div class="product-info">
+                    <h3>MGtranslate</h3>
+                    <p>Real-time translation solution for Google Meet, enabling seamless multilingual communication in video conferences.</p>
+                    <ul class="product-features">
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                                <path d="M22 4L12 14.01l-3-3"/>
+                            </svg>
+                            Real-time speech-to-text with Whisper AI
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                                <path d="M22 4L12 14.01l-3-3"/>
+                            </svg>
+                            GPT-powered contextual translation
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                                <path d="M22 4L12 14.01l-3-3"/>
+                            </svg>
+                            Google Meet Media API integration
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                                <path d="M22 4L12 14.01l-3-3"/>
+                            </svg>
+                            Natural voice synthesis output
+                        </li>
+                    </ul>
+                    <a href="https://mg.falconsoft.dev" class="btn btn-primary">Learn More</a>
+                </div>
+                <div class="product-visual">
+                    <svg viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="20" y="20" width="260" height="160" rx="8" fill="#1e293b"/>
+                        <rect x="30" y="30" width="120" height="80" rx="4" fill="#334155"/>
+                        <rect x="160" y="30" width="110" height="80" rx="4" fill="#334155"/>
+                        <circle cx="90" cy="70" r="25" fill="#475569"/>
+                        <circle cx="215" cy="70" r="25" fill="#475569"/>
+                        <rect x="30" y="120" width="240" height="50" rx="4" fill="#334155"/>
+                        <rect x="40" y="130" width="180" height="8" rx="2" fill="#2563eb"/>
+                        <rect x="40" y="145" width="120" height="6" rx="2" fill="#06b6d4"/>
+                        <rect x="40" y="157" width="200" height="6" rx="2" fill="#475569"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about">
+        <div class="container">
+            <div class="about-content">
+                <div class="about-text">
+                    <h2>About Falcon Soft</h2>
+                    <p>Falcon Soft is a software engineering company dedicated to building high-quality, scalable solutions that drive business success. Our team combines deep technical expertise with a passion for innovation.</p>
+                    <p>We specialize in developing applications that leverage cutting-edge technologies including artificial intelligence, real-time communication systems, and cloud-native architectures.</p>
+                    <p>Our commitment to excellence extends beyond code. We prioritize security, user experience, and long-term maintainability in every project we undertake.</p>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <h4>50+</h4>
+                        <p>Projects Delivered</p>
+                    </div>
+                    <div class="stat-item">
+                        <h4>99%</h4>
+                        <p>Client Satisfaction</p>
+                    </div>
+                    <div class="stat-item">
+                        <h4>24/7</h4>
+                        <p>Support Available</p>
+                    </div>
+                    <div class="stat-item">
+                        <h4>5+</h4>
+                        <p>Years Experience</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact">
+        <div class="container">
+            <div class="section-header">
+                <h2>Let's Build Something Great</h2>
+                <p>Ready to start your project? Get in touch with our team.</p>
+            </div>
+            <div class="contact-content">
+                <div class="contact-info">
+                    <h3>Contact Information</h3>
+                    <div class="contact-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                            <path d="M22 6l-10 7L2 6"/>
+                        </svg>
+                        <a href="mailto:marcelo@falconsoft.dev">marcelo@falconsoft.dev</a>
+                    </div>
+                    <div class="contact-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+                        </svg>
+                        <a href="https://falconsoft.dev">falconsoft.dev</a>
+                    </div>
+                    <div class="contact-item" style="align-items: flex-start;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0; margin-top: 4px;">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                            <circle cx="12" cy="10" r="3"/>
+                        </svg>
+                        <div style="line-height: 1.6;">
+                            <strong>Mp5 Marketing e Consultoria LTDA</strong><br>
+                            Rua Do Cupim, 132 - Cxpst 343<br>
+                            Gracas, Recife - PE<br>
+                            CEP: 52011-070<br>
+                            Brasil
+                        </div>
+                    </div>
+                </div>
+                <form class="contact-form" action="#" method="POST">
+                    <input type="text" name="name" placeholder="Your Name" required>
+                    <input type="email" name="email" placeholder="Your Email" required>
+                    <input type="text" name="subject" placeholder="Subject">
+                    <textarea name="message" placeholder="Tell us about your project..." required></textarea>
+                    <button type="submit" class="btn btn-primary">Send Message</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <p>&copy; 2024 Falcon Soft. All rights reserved.</p>
+                <div class="footer-links">
+                    <a href="/privacy">Privacy Policy</a>
+                    <a href="/terms">Terms of Service</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
